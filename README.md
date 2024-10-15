@@ -44,6 +44,11 @@ to the real-time gas analyzer readings or other events such as stimulation event
 A labjack device (U3-HV) is connected to each of the instruments to capture analog values.
 Most useful is the SA Instruments Breakout Box, but also have options for gas analyzers, pumps, and stimulators, 
 some of which have been used.
+<br><br>
+
+**Example Display** (unconnected example):<br>
+![image](https://github.com/user-attachments/assets/1bdc22e0-cef0-47a8-ba0c-38accdf73fab)
+
 
 <br><br>
 Matt Budde, MCW, Copyright 2024
