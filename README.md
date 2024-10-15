@@ -41,7 +41,7 @@ prior to starting recording. Useful for recording changes in delivered anesthesi
 to the real-time gas analyzer readings or other events such as stimulation events.
 
 **Setup**:<br>
-A labjack device (U3-HV) is connected to each of the instruments to capture analog values.
+A labjack device (U3-LV) is connected to each of the instruments to capture analog values.
 Most useful is the SA Instruments Breakout Box, but also have options for gas analyzers, pumps, and stimulators, 
 some of which have been used.
 <br><br>
