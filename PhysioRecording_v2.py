@@ -144,13 +144,10 @@ Programming:
       -There are occasionally errors with the configuration and having to restart, error is analog on digital channel.  We should properly configure the labjack explicitly
       with the analog connections based on its hardware connections in the init function.
 
-    10/4/24:
-    - Modified program to run continuously and log data to the main data directory for a given scan/study. This was done for cases where one does not want to stop
-      recording during the scan setup/prep phases.
-    - Small modifications to the gui to make it cleaner and more compact.
-
     TODO:
+    - add timer and alert for monitoring by hand.
     - add module to control the stimulator to replace the old pc laptop and provide more options for experimental control (loops, variable timing, etc).
+    - add toggle for saving during run without PV or not, since lots of files could get generated and may not be desired.
 
 
 """
@@ -660,7 +657,7 @@ def MonitorPVstatus(param, statusparam):
         process = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         dsetpath, error = process.communicate()
 	#print(dsetpath)
-        statusparam.studypath = dsetpath
+        statusparam.studypath = os.path.dirname(dsetpath.split('pdata')[0].rstrip('/')) #this removes the scannumber and leaves the study only
 
         #cmd="pvcmd -a ParxServer -r DsetGetPath -psid " + gui_psid + " -path STUDY"
         #process = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -1113,6 +1110,83 @@ def CaptureAndWriteLog(fd, param, p2cQ, c2pQ):
         #update the number of iterations
         currIter = currIter + 1
 
+
+#def convertInttoValue(value,metric,channel):
+    ##will need to test and build these out for more options.
+
+    ##The U3-HV device measures -10 to +10 Volts and converts to a 16-bit unsigned integer.
+    ##All data from the SAI breakout box is 0 to +5 Volts (12-bit conversion)
+    ##so 2^16 / 2 is 32768; subtract this from all values to get 0=0.
+    ## We could use the labjack calibration to convert integer to voltages, but that is unnecessary since we'd have to reconvert to values anyway.
+
+    ## There might need to be some additional calibration or other refinements that go into this setup.
+    ## most of the values were found emperically and don't entirely make logical sense.
+    #warningstr = ''
+
+    #### SA Instruments Connections from Breakout Box ###
+    #if metric == "T1Temp":
+        #result = (value - 32768)/180.0
+                ##temp is in celcius as value/180 according to the SA manual.
+        #if result < 0:
+            #warningstr = 'Neg Temp'
+    #elif metric == "PRespRate":
+        #result = (value - 32944)/8.0 * 5.0/10.0
+                ##rates are supposed to be BPM/count, but the 32944 is the lowest value empirically for respiration
+                ##also unclear is why the /16.0 is necessary, but this also works empirically.
+                ##it may be due to the 12 to 16 bit conversion, which is a factor of 16 (2^4).
+        #if result < 0:
+            #warningstr = 'Neg Resp Rate'
+    #elif metric == "ECGRate":
+        #result = (value - 32944)/8.0 * 5.0/10.0
+                ##not tested.
+        #if result < 0:
+            #warningstr = 'Neg ECG Rate'
+    #elif metric == "PRespPeriod":
+        #result = (value - 32944)/8.0 * 5.0
+    #elif ((metric == "BP2Rate") or (metric == "BP3Rate") or (metric == "BP1Rate")):
+        #bp2rateoffset = -112
+        #result = (value - 32768 + bp2rateoffset)/8.0 * 5.0/10.0
+                ##not tested.
+    #elif ((metric == "BP2Mean") or (metric == "BP3Mean") or (metric == "BP1Mean")):
+        #bp2meanoffset = -48
+        #result = ((value - 32768 + bp2meanoffset)/8 * 5.0/10. - 90 ) / 3.
+                ##not tested.
+  
+
+    #### POET Gas analyzer conditions ###
+    #elif metric == "IsoLevel":
+        ##it appears that the integer to voltage conversion is simply int/8194, which means a value of iso=4 is 2.4 volts (12-bit).
+        ##need to test to confirm.
+        ##note that with the FIO connections, values are from 0-2.4V, Not -/+.
+        #result = (value)/8194.0  #old: 10000.0*0.822 #scaling determined from testing = 1/1.21 and manual recording of read values to Poet displayed values, so approximate.
+        #if result > 5:
+            #warningstr = 'High Iso'
+    #elif metric == "O2":
+        #result = (value)/1000.0
+        #if result < 17:
+            #warningstr = 'Low O2'
+    #elif metric == "CO2":
+        #result = (value)/1000.0
+        #if result < 17:
+            #warningstr = 'Low O2'
+  
+    #### GRASS stimulator, not tested or setup with hardware ###
+    #elif metric == "ControlLine":
+        #if (value > 32768):
+            #result = 1
+        #else:
+            #result = 0
+  
+    #### Harvard Apparatus Syringe Injection Pump ###
+    #elif metric == "PumpStat": #Syringe pump injector, the 3 pin of the 9-pin output is high-running, low-not running.
+        #if (value > 16384):  #need to test after setting up connections
+            #result = 1
+        #else:
+            #result = 0
+    #else:
+        #result = (value - 32768)/1.0
+
+    #return result, warningstr
 
 
 
