@@ -47,8 +47,7 @@ GUI:
     so each user will need them installed during the first run of the program.
 
 Configuration:
-    The labjack (U3-HV) is connected to the SA Instruments Breakout box on the analog connections,
-    which provide -10/+10V ranges. This exceeds the 0-5V range of the output.
+    The labjack (U3-LV) is connected to the SA Instruments Breakout box on the analog connections.
     PC-SAM needs to be configure (and importantly, enabled) to output the correct data.
 
     The POET gas analyzer analog output (single channel) is also connected to the flexible (FIO4)
@@ -71,7 +70,7 @@ Configuration:
 
     Sample period is the time period of each sample.
 
-    Both are set in the gui and saved to the users home directory: SARecording.ini as defaults.
+    Both are set in the gui and saved to the users home directory: SARecording.ini as defaults. Most actions in the gui re-save these values.
 
     Additional custom values can be set and updated to new values during the recording, for example the isofluorane
     levels can be input and saved along with the other values. Events such as changes in gas or other stimulation
@@ -82,9 +81,8 @@ Configuration:
     the precise scan times, since that has not been rigorously evaluted.
 
 Running:
-    In the simple case, it can be started in  Run wihout Logging mode, which  simply just
-    monitors and outputs to the  screen the sampled  values. Good for testing the recording
-    and scaling of values to match what is expected. More testing needs to ensure and add more options.
+    In the simple case, it can be started in  Run continuous mode, which saves to either the current 
+    scan main data directory (if started when an experiment was selected), or to the users home directory.
 
     When started in PV mode, the program regularly communicates with the paravision interface, pvcmd,
     to get the scan status and current scan. The recording will only occur during a scanning process,
@@ -144,11 +142,13 @@ Programming:
       -There are occasionally errors with the configuration and having to restart, error is analog on digital channel.  We should properly configure the labjack explicitly
       with the analog connections based on its hardware connections in the init function.
 
-    TODO:
-    - add timer and alert for monitoring by hand.
-    - add module to control the stimulator to replace the old pc laptop and provide more options for experimental control (loops, variable timing, etc).
-    - add toggle for saving during run without PV or not, since lots of files could get generated and may not be desired.
+    10/4/24:
+    - Modified program to run continuously and log data to the main data directory for a given scan/study. This was done for cases where one does not want to stop
+      recording during the scan setup/prep phases.
+    - Small modifications to the gui to make it cleaner and more compact.
 
+    TODO:
+    - add module to control the stimulator to replace the old pc laptop and provide more options for experimental control (loops, variable timing, etc).
 
 """
 
