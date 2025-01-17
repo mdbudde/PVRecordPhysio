@@ -47,7 +47,8 @@ GUI:
     so each user will need them installed during the first run of the program.
 
 Configuration:
-    The labjack (U3-LV) is connected to the SA Instruments Breakout box on the analog connections.
+    The labjack (U3-HV) is connected to the SA Instruments Breakout box on the analog connections,
+    which provide -10/+10V ranges. This exceeds the 0-5V range of the output.
     PC-SAM needs to be configure (and importantly, enabled) to output the correct data.
 
     The POET gas analyzer analog output (single channel) is also connected to the flexible (FIO4)
@@ -70,7 +71,7 @@ Configuration:
 
     Sample period is the time period of each sample.
 
-    Both are set in the gui and saved to the users home directory: SARecording.ini as defaults. Most actions in the gui re-save these values.
+    Both are set in the gui and saved to the users home directory: SARecording.ini as defaults.
 
     Additional custom values can be set and updated to new values during the recording, for example the isofluorane
     levels can be input and saved along with the other values. Events such as changes in gas or other stimulation
@@ -81,8 +82,9 @@ Configuration:
     the precise scan times, since that has not been rigorously evaluted.
 
 Running:
-    In the simple case, it can be started in  Run continuous mode, which saves to either the current 
-    scan main data directory (if started when an experiment was selected), or to the users home directory.
+    In the simple case, it can be started in  Run wihout Logging mode, which  simply just
+    monitors and outputs to the  screen the sampled  values. Good for testing the recording
+    and scaling of values to match what is expected. More testing needs to ensure and add more options.
 
     When started in PV mode, the program regularly communicates with the paravision interface, pvcmd,
     to get the scan status and current scan. The recording will only occur during a scanning process,
@@ -142,13 +144,11 @@ Programming:
       -There are occasionally errors with the configuration and having to restart, error is analog on digital channel.  We should properly configure the labjack explicitly
       with the analog connections based on its hardware connections in the init function.
 
-    10/4/24:
-    - Modified program to run continuously and log data to the main data directory for a given scan/study. This was done for cases where one does not want to stop
-      recording during the scan setup/prep phases.
-    - Small modifications to the gui to make it cleaner and more compact.
-
     TODO:
+    - add timer and alert for monitoring by hand.
     - add module to control the stimulator to replace the old pc laptop and provide more options for experimental control (loops, variable timing, etc).
+    - add toggle for saving during run without PV or not, since lots of files could get generated and may not be desired.
+
 
 """
 
@@ -321,7 +321,7 @@ def main():
         else:
             statusparam.statuscolor = 'black'
 
-        window['-LOGPATH-'].update(statusparam.studypath)
+        window['-LOGPATH-'].update(statusparam.datapath)
         window['-STATUS-'].update(statusparam.recordingstatus, text_color = statusparam.statuscolor)
         window['-PVSTATUS-'].update(statusparam.scanstatus + "; " + statusparam.experimentstatus, text_color = statusparam.scanstatuscolor)
 
@@ -656,8 +656,14 @@ def MonitorPVstatus(param, statusparam):
         cmd="pvcmd -a ParxServer -r ListPs | grep 'DSET PATH' | awk '{printf(\"%s\", $3)}'"
         process = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         dsetpath, error = process.communicate()
-	#print(dsetpath)
-        statusparam.studypath = os.path.dirname(dsetpath.split('pdata')[0].rstrip('/')) #this removes the scannumber and leaves the study only
+	    #print(dsetpath)
+        statusparam.studypath = dsetpath.split('pdata')[0]
+        statusparam.datapath = statusparam.studypath.rstrip('/') #remove the trailing slash
+        statusparam.datapath = statusparam.datapath.rsplit('/',1)[0] #remove the last expno 
+
+        if (statusparam.datapath == None) or (statusparam.datapath == ""):
+            statusparam.datapath = param.homedir
+            statusparam.studypath = param.homedir
 
         #cmd="pvcmd -a ParxServer -r DsetGetPath -psid " + gui_psid + " -path STUDY"
         #process = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -665,7 +671,7 @@ def MonitorPVstatus(param, statusparam):
         # print(statusparam.studypath)
     except:
         statusparam.studypath = param.homedir
-
+        statusparam.datapath = statusparam.studypath
 
     #this gets the scan that is currently running since it was started from the 'pipemaster' parent
     cmd="pvcmd -a ParxServer -r ListPs | grep -B 3 'pipeMaster' | grep -m 1 PSID | awk '{printf(\"%s\", $2)}'"
@@ -679,9 +685,13 @@ def MonitorPVstatus(param, statusparam):
             cmd="pvcmd -a ParxServer -r DsetGetPath -psid "+statusparam.psid+" -path EXPNO"
             process = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             statusparam.datapath, error = process.communicate()
+            statusparam.datapath = statusparam.datapath.split('pdata')[0] #if pdata exists remove everything after
+            statusparam.datapath = statusparam.datapath.rstrip('/')
+            print(statusparam.datapath)
             pathlist=string.rsplit(statusparam.datapath,'/',1)
             expno=pathlist[1]
             statusparam.expno = expno
+            statusparam.datapath = pathlist[0] #now get the main subject path
 
 
             cmd="pvcmd -a ParxServer -r ParamGetValue -psid "+statusparam.psid+" -param SUBJECT_study_instance_uid"
@@ -694,16 +704,20 @@ def MonitorPVstatus(param, statusparam):
             statusparam.experimentstatus, error = process.communicate()
             # print(statusparam.experimentstatus)
             statusparam.experimentstatus = statusparam.experimentstatus.split("_")[0] #Scan or Setup
-            #if not statusparam.experimentstatus == "Scan_Experiment":
+            if not (statusparam.experimentstatus in ["Scan","Setup"]):
+                 statusparam.experimentstatus = 'Idle'
             #    return statusparam
 
             cmd="pvcmd -a JPingo -r DSetServer.GetScanStatus -registration "+studyRegID+" -expno "+expno
             process = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             statusparam.scanstatus, error = process.communicate()
-            #if not (statusparam.scanstatus=="SCANNING" or statusparam.scanstatus == "RECO"):
+            if not (statusparam.scanstatus in ["SCANNING","RECO","ADJUST"]):
+                 statusparam.scanstatus = 'Idle'
             #    return statusparam
         except:
             statusparam.expno = '0'
+            statusparam.scanstatus = "Idle"
+            statusparam.experimentstatus = "Idle"
             return statusparam
 
         if statusparam.internalRunMonitor == True:
@@ -770,7 +784,7 @@ def StartRecording(param, statusparam):
         if statusparam.studypath == '' or statusparam.studypath == None:
             statusparam.logPath = param.homedir+"/PhysioRecordingLog"+dstr+".txt"
         else:
-            statusparam.logPath = statusparam.studypath+"/PhysioRecordingLog"+dstr+".txt"
+            statusparam.logPath = statusparam.datapath+"/PhysioRecordingLog"+dstr+".txt"
 
         try:
             statusparam.fileHandle = open(statusparam.logPath,"w",buffering=0)
@@ -798,6 +812,7 @@ def StartRecording(param, statusparam):
 
     # Update the header in the gui, do this here so no need to communicate via a queue.
     headerList = ["Count", "TimeMS"]
+
     if param.AddExpAndStatus == True:
         headerList.extend(["ScanStat","ExpStat","Exp"])
     # No spaces in custom values allowed.
@@ -807,6 +822,7 @@ def StartRecording(param, statusparam):
             headerList.append(param.CustomLabel2.replace(" ", ""))
             if param.CustomEnabled3 == True:
                 headerList.append(param.CustomLabel3.replace(" ", "")) 
+
     headerList.extend(param.currentChannelMetricList)
     headerList.append("Warnings")
     headerOut = FormattedLine(headerList, headerList)
@@ -841,8 +857,13 @@ def StartRecording(param, statusparam):
         
     if (param.AddExpAndStatus == True) or (param.CustomEnabled1 == True):    
         # Overwrite the status in the queue by removing the old one if needed
-        while not statusparam.ParentToCaptureQueue.empty():
-            statusparam.ParentToCaptureQueue.get_nowait()  # Remove the current items to replace it
+        #while not statusparam.ParentToCaptureQueue.empty():
+        #    statusparam.ParentToCaptureQueue.get_nowait()  # Remove the current items to replace it
+	while True:
+	    try:
+        	statusparam.ParentToCaptureQueue.get_nowait()  # Remove the current items to replace it
+	    except: # Queue.Empty:
+		break
         statusparam.ParentToCaptureQueue.put(customstring)
 
     return statusparam
@@ -866,8 +887,15 @@ def UpdateRecording(param, statusparam):
                     customstring = customstring + "," + statusparam.CustomValue3.replace(" ","")
             
         if (param.AddExpAndStatus == True) or (param.CustomEnabled1 == True):   
-            while not statusparam.ParentToCaptureQueue.empty():
-                statusparam.ParentToCaptureQueue.get_nowait()  # Remove the current items to replace it 
+            #while not statusparam.ParentToCaptureQueue.empty():
+            #    statusparam.ParentToCaptureQueue.get_nowait()  # Remove the current items to replace it 
+	    # the old while/get_nowait code was throwing errors and halding the program.
+	    # this while/try/except loop seems to be the more preferred option to handle emptying more directly and safely.  Needs to be tested to determine if it works.
+	    while True:
+	        try:
+        	    statusparam.ParentToCaptureQueue.get_nowait()  # Remove the current items to replace it
+	        except:# Queue.empty:
+		    break
             statusparam.ParentToCaptureQueue.put(customstring)
     
     return statusparam
@@ -978,7 +1006,8 @@ def CaptureAndWriteLog(fd, param, p2cQ, c2pQ):
     starttime=ptime
 
     # Write the header, this is simply csv formatted
-    headerString = "Count, TimeMS"
+    headerString = "Count, TimeMS, "
+    headerString = headerString + ", ".join(param.currentChannelMetricList)
     
     if param.AddExpAndStatus == True:
         headerString = headerString + ", Status, ExpStatus, Exp"
@@ -990,7 +1019,6 @@ def CaptureAndWriteLog(fd, param, p2cQ, c2pQ):
             if param.CustomEnabled3 == True:
                 headerString = headerString + ", " + param.CustomLabel3.replace(" ", "")
 
-    headerString = headerString + ", ".join(param.currentChannelMetricList)
     fd.write(headerString+'\n')
     #print(headerString)
 
@@ -1093,10 +1121,13 @@ def CaptureAndWriteLog(fd, param, p2cQ, c2pQ):
             dataList.append('{:.1f}'.format(resultsCalibratedInteger[n]))
 
         dataList.append(' '.join(warningstr))
-        dataOut = FormattedLine(headerList, dataList)
+        try:
+            dataOut = FormattedLine(headerList, dataList)
 
-        #warnings are displayed in the dynamic output, but not saved to the file.
-        c2pQ.put(dataOut + '\n')
+            #warnings are displayed in the dynamic output, but not saved to the file.
+            c2pQ.put(dataOut + '\n')
+        except:
+            print('Formatting Error. Skipping')
 
         # Adjust the sleep time to account for processing delays to try and maintain the sample period accuracy
         # basically, adjust the delay based on the expected and actual time of the last recording.
@@ -1263,7 +1294,7 @@ def convertCalibratedVoltagetoValue(value,metric,channel):
     ### GRASS stimulator, not tested or setup with hardware ###
     elif metric == "ControlLine":
         #not tested
-        if (value > 32768):
+        if (value > 0.8):
             result = 1
         else:
             result = 0
