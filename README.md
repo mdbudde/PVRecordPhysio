@@ -1,7 +1,7 @@
 # PVRecordPhysio
 Recording time-locked animal physiology alongside MRI (Bruker) paravision
 
-GUI to configure and record physiologic data alongsice MRI data in Paravision environment.
+GUI to configure and record physiologic data alongside MRI data in Paravision environment.
 
 Once hardware has been connected and configured, this program will record values to a text file at a prescribed 
 interval alongside the MRI data. This approach makes it easier to view and use the values in subsequent processing. 
@@ -18,20 +18,29 @@ The script will attempt to use pip/user commands if the modules are not found.
 In practice, the pysimplegui27 fails to start, but works if the script is restarted.
 
 May need to run:
+```
 sudo yum install tkinter  #requires su/root
 pip install typing --user
 pip install configparser --user
 pip install pysimplegui27 --user
+```
 
-On a recent installation, it was necessary to do downgrade pip first to get the installation working:
+On a recent installation, it was necessary to downgrade pip first to get the installation working:
+```
 python -m pip install --upgrade "pip < 19.2"
+```
 then:
-python -m pip install --upgrade "pip < 21.0".
+```
+python -m pip install --upgrade "pip < 21.0"
+```
 <br><br>
 
 
 **Quickstart**:<br>
-In a Terminal window started from paravision (critical), start program: python PhysioRecording_v2.py
+In a Terminal window started from paravision (critical), start program: 
+```
+python PhysioRecording_v2.py
+```
 Select configuration/channels to record, ensure they match the PC-SAM, POET, GRASS, or Infusion Pump output.
 Start PV Recording (once after starting paravision)
 Data will be automatically recorded to raw data folders.
